@@ -1,0 +1,5 @@
+{
+  "name": "ViBA Studio",
+  "description": "A Material Design AI visual creative workbench featuring image derivation, avatar creation, virtual try-on, and character swapping powered by Gemini 3 Pro.",
+  "requestFramePermissions": []
+}

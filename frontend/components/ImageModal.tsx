@@ -1,0 +1,32 @@
+import React from 'react';
+import { X } from 'lucide-react';
+
+interface ImageModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  imageUrl: string | null;
+}
+
+export const ImageModal: React.FC<ImageModalProps> = ({ isOpen, onClose, imageUrl }) => {
+  if (!isOpen || !imageUrl) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <button 
+        className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors bg-black/20 hover:bg-black/40 rounded-full p-2"
+        onClick={onClose}
+      >
+        <X size={32} />
+      </button>
+      <img 
+        src={imageUrl} 
+        alt="Enlarged view" 
+        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()} 
+      />
+    </div>
+  );
+};

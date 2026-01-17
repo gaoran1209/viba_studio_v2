@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { View } from './types';
@@ -28,41 +28,43 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-const Dashboard: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>(View.DERIVATION);
+const DashboardLayout: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Determine current view based on path
+  const getCurrentView = (): View => {
+    const path = location.pathname;
+    if (path.includes('/avatar')) return View.AVATAR;
+    if (path.includes('/tryon')) return View.TRY_ON;
+    if (path.includes('/swap')) return View.SWAP;
+    if (path.includes('/prompts')) return View.SYSTEM_PROMPTS;
+    return View.DERIVATION;
+  };
+
+  const currentView = getCurrentView();
+
+  const handleNavigate = (view: View) => {
+    switch(view) {
+      case View.AVATAR: navigate('/avatar'); break;
+      case View.TRY_ON: navigate('/tryon'); break;
+      case View.SWAP: navigate('/swap'); break;
+      case View.SYSTEM_PROMPTS: navigate('/prompts'); break;
+      case View.DERIVATION: 
+      default:
+        navigate('/derivation');
+    }
+  };
 
   return (
     <div className="flex h-screen bg-[#F9FAFB] overflow-hidden">
-      <Sidebar currentView={currentView} onNavigate={setCurrentView} />
+      <Sidebar currentView={currentView} onNavigate={handleNavigate} />
       
       <div className="flex-1 ml-64 flex flex-col h-full">
         <Header currentView={currentView} />
         
         <main className="flex-1 p-8 h-full overflow-hidden relative">
-          {/* Derivation View: Handles its own internal scrolling */}
-          <div className={`h-full w-full ${currentView === View.DERIVATION ? 'block' : 'hidden'}`}>
-            <DerivationView />
-          </div>
-
-          {/* Avatar View: Needs external scrolling context */}
-          <div className={`h-full w-full overflow-auto ${currentView === View.AVATAR ? 'block' : 'hidden'}`}>
-            <AvatarView />
-          </div>
-
-          {/* Try On View: Fixed layout */}
-          <div className={`h-full w-full ${currentView === View.TRY_ON ? 'block' : 'hidden'}`}>
-             <TryOnView />
-          </div>
-
-          {/* Swap View: Fixed layout */}
-           <div className={`h-full w-full ${currentView === View.SWAP ? 'block' : 'hidden'}`}>
-             <SwapView />
-          </div>
-
-          {/* System Prompts: Needs external scrolling context */}
-           <div className={`h-full w-full overflow-auto ${currentView === View.SYSTEM_PROMPTS ? 'block' : 'hidden'}`}>
-             <SystemPromptsView />
-          </div>
+          <Outlet />
         </main>
       </div>
     </div>
@@ -78,14 +80,23 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              
+              {/* Protected Dashboard Routes */}
               <Route 
-                path="/" 
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <DashboardLayout />
                   </ProtectedRoute>
-                } 
-              />
+                }
+              >
+                <Route path="/" element={<Navigate to="/derivation" replace />} />
+                <Route path="/derivation" element={<DerivationView />} />
+                <Route path="/avatar" element={<AvatarView />} />
+                <Route path="/tryon" element={<TryOnView />} />
+                <Route path="/swap" element={<SwapView />} />
+                <Route path="/prompts" element={<SystemPromptsView />} />
+              </Route>
+
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </ModelConfigProvider>

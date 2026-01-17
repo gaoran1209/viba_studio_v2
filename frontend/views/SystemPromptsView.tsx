@@ -123,3 +123,5 @@ export const SystemPromptsView: React.FC = () => {
     </div>
   );
 };
+
+export default SystemPromptsView;

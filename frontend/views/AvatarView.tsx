@@ -46,6 +46,7 @@ const AvatarThumbnail: React.FC<{ file: File; onRemove: () => void }> = ({ file,
 
 export const AvatarView: React.FC = () => {
   const { t } = useLanguage();
+  const { config } = useModelConfig(); // Get config from context
   const [files, setFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   

@@ -281,7 +281,7 @@ export const DerivationView: React.FC = () => {
             </div>
           ) : (
             jobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm flex flex-col lg:flex-row h-auto min-h-[420px]">
+              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm flex flex-col lg:flex-row h-[420px]">
                 
                 {/* Left: Info Panel (Source & Description) */}
                 <div className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-gray-100 p-6 flex flex-col bg-white shrink-0">
@@ -299,8 +299,8 @@ export const DerivationView: React.FC = () => {
                       </button>
                    </div>
 
-                   <div className="mb-6 flex flex-col gap-3">
-                     <div className="relative aspect-[3/4] w-full bg-gray-50 rounded-lg overflow-hidden border border-gray-100 group">
+                   <div className="mb-4 flex flex-col gap-3">
+                     <div className="relative aspect-[3/4] h-32 w-24 bg-gray-50 rounded-lg overflow-hidden border border-gray-100 group self-start">
                         <img src={job.previewUrl} alt="Source" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
                      </div>
@@ -331,14 +331,14 @@ export const DerivationView: React.FC = () => {
                    </div>
                 </div>
 
-                {/* Right: Results Grid (2x2) */}
-                <div className="flex-1 bg-gray-50/30 p-4 lg:p-6">
+                {/* Right: Results Grid (Max 4 images per row) */}
+                <div className="flex-1 bg-gray-50/30 p-4 lg:p-6 overflow-hidden">
                    {job.status === 'completed' ? (
-                     <div className="grid grid-cols-2 gap-4 h-full">
+                     <div className="grid grid-cols-4 gap-4 h-full overflow-y-auto pr-2 content-start">
                         {job.results.map((url, idx) => (
                           <div 
                             key={idx} 
-                            className="relative group rounded-xl overflow-hidden bg-gray-200 cursor-pointer border border-gray-200 h-full min-h-[160px]"
+                            className="relative group rounded-xl overflow-hidden bg-gray-200 cursor-pointer border border-gray-200 aspect-[3/4]"
                             onClick={() => setPreviewImage(url)}
                           >
                             <img src={url} alt={`Var ${idx}`} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />

@@ -200,10 +200,10 @@ export const AvatarView: React.FC = () => {
             </div>
           ) : (
             jobs.map(job => (
-              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[400px]">
+              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[420px]">
                 
                 {/* Left Panel: Inputs */}
-                <div className="w-full md:w-80 border-r border-gray-100 bg-white p-6 flex flex-col shrink-0">
+                <div className="w-full md:w-80 border-r border-gray-100 bg-white p-6 flex flex-col shrink-0 h-full overflow-hidden">
                    <div className="flex justify-between items-start mb-6">
                       <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wide 
                         ${job.status === 'completed' ? 'bg-green-100 text-green-700' : 

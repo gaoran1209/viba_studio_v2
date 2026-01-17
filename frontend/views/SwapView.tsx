@@ -159,7 +159,7 @@ export const SwapView: React.FC = () => {
             </div>
           ) : (
             jobs.map(job => (
-              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[400px]">
+              <div key={job.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row h-[420px]">
                 
                 {/* Left Panel: Inputs */}
                 <div className="w-full md:w-80 border-r border-gray-100 bg-white p-6 flex flex-col shrink-0">

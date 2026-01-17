@@ -60,13 +60,15 @@ export const SystemPromptsView: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900">{t.prompts.title}</h2>
-        <p className="text-gray-500 mt-2">{t.prompts.desc}</p>
-      </div>
+    <div className="flex flex-col h-full overflow-hidden bg-gray-50/50">
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-6xl mx-auto pb-20">
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900">{t.prompts.title}</h2>
+            <p className="text-gray-500 mt-2">{t.prompts.desc}</p>
+          </div>
 
-      <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="grid grid-cols-12 bg-gray-50/80 border-b border-gray-200 p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
           <div className="col-span-3">{t.prompts.feature}</div>
           <div className="col-span-3">{t.prompts.model}</div>
@@ -119,6 +121,8 @@ export const SystemPromptsView: React.FC = () => {
              );
           })}
         </div>
+      </div>
+    </div>
       </div>
     </div>
   );

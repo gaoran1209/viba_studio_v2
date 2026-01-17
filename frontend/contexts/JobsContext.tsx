@@ -15,26 +15,33 @@ interface JobsContextType {
 const JobsContext = createContext<JobsContextType | undefined>(undefined);
 
 export const JobsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Helper to safely parse JSON from localStorage
+  const safeParse = <T,>(key: string, fallback: T): T => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : fallback;
+    } catch (error) {
+      console.error(`Error parsing localStorage key "${key}":`, error);
+      return fallback;
+    }
+  };
+
   // Initialize state from localStorage
-  const [derivationJobs, setDerivationJobs] = useState<DerivationJob[]>(() => {
-    const saved = localStorage.getItem('viba_derivation_jobs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [derivationJobs, setDerivationJobs] = useState<DerivationJob[]>(() => 
+    safeParse('viba_derivation_jobs', [])
+  );
 
-  const [avatarJobs, setAvatarJobs] = useState<AvatarJob[]>(() => {
-    const saved = localStorage.getItem('viba_avatar_jobs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [avatarJobs, setAvatarJobs] = useState<AvatarJob[]>(() => 
+    safeParse('viba_avatar_jobs', [])
+  );
 
-  const [tryOnJobs, setTryOnJobs] = useState<TryOnJob[]>(() => {
-    const saved = localStorage.getItem('viba_tryon_jobs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [tryOnJobs, setTryOnJobs] = useState<TryOnJob[]>(() => 
+    safeParse('viba_tryon_jobs', [])
+  );
 
-  const [swapJobs, setSwapJobs] = useState<SwapJob[]>(() => {
-    const saved = localStorage.getItem('viba_swap_jobs');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [swapJobs, setSwapJobs] = useState<SwapJob[]>(() => 
+    safeParse('viba_swap_jobs', [])
+  );
 
   // Persist to localStorage whenever state changes
   useEffect(() => {

@@ -11,6 +11,7 @@ import SystemPromptsView from './views/SystemPromptsView';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ModelConfigProvider } from './contexts/ModelConfigContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { JobsProvider } from './contexts/JobsContext';
 import { LoginPage } from './views/LoginPage';
 import { RegisterPage } from './views/RegisterPage';
 
@@ -45,8 +46,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <pre className="text-sm text-red-500 bg-gray-100 p-4 rounded overflow-auto max-w-2xl">
             {this.state.error?.toString()}
           </pre>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Reload Page
@@ -61,11 +62,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-  
+
   if (loading) {
     return <div className="flex items-center justify-center h-screen bg-gray-50">Loading...</div>;
   }
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -90,12 +91,12 @@ const DashboardLayout: React.FC = () => {
   const currentView = getCurrentView();
 
   const handleNavigate = (view: View) => {
-    switch(view) {
+    switch (view) {
       case View.AVATAR: navigate('/avatar'); break;
       case View.TRY_ON: navigate('/tryon'); break;
       case View.SWAP: navigate('/swap'); break;
       case View.SYSTEM_PROMPTS: navigate('/prompts'); break;
-      case View.DERIVATION: 
+      case View.DERIVATION:
       default:
         navigate('/derivation');
     }
@@ -104,10 +105,10 @@ const DashboardLayout: React.FC = () => {
   return (
     <div className="flex h-screen bg-[#F9FAFB] overflow-hidden">
       <Sidebar currentView={currentView} onNavigate={handleNavigate} />
-      
+
       <div className="flex-1 ml-64 flex flex-col h-full">
         <Header currentView={currentView} />
-        
+
         <main className="flex-1 p-8 h-full overflow-hidden relative">
           <Outlet />
         </main>
@@ -127,9 +128,9 @@ const App: React.FC = () => {
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
-                  
+
                   {/* Protected Dashboard Routes */}
-                  <Route 
+                  <Route
                     element={
                       <ProtectedRoute>
                         <DashboardLayout />

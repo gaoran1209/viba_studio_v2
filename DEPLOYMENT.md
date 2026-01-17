@@ -32,6 +32,34 @@ The backend is a Node.js Express application handling Auth and AI Generation.
     *   `JWT_SECRET`: Generate a strong random string (e.g., `openssl rand -hex 32`).
     *   `GEMINI_API_KEY`: Your Google Gemini API Key.
     *   `PORT`: `3001` (Optional, Render sets this automatically).
+    *   **R2 Storage (Optional but recommended)**:
+        *   `R2_ACCOUNT_ID`: Your Cloudflare Account ID.
+        *   `R2_ACCESS_KEY_ID`: R2 API Access Key ID.
+        *   `R2_SECRET_ACCESS_KEY`: R2 API Secret Access Key.
+        *   `R2_BUCKET_NAME`: Name of your R2 bucket (e.g., `viba-studio-images`).
+        *   `R2_PUBLIC_URL`: (Optional) Custom domain for public access.
+
+### Setting Up Cloudflare R2
+
+Cloudflare R2 is used for storing generated images efficiently instead of storing them as base64 in the database.
+
+1.  **Create R2 Bucket**:
+    *   Log in to Cloudflare Dashboard.
+    *   Navigate to **R2 Object Storage** -> **Create bucket**.
+    *   Name it (e.g., `viba-studio-images`).
+
+2.  **Create API Token**:
+    *   Go to **R2** -> **Manage R2 API Tokens**.
+    *   Create a token with **Admin Read & Write** permissions.
+    *   Copy the **Access Key ID** and **Secret Access Key**.
+
+3.  **Get Account ID**:
+    *   Your Account ID is in the Cloudflare Dashboard URL or in **Workers & Pages** overview.
+
+4.  **Optional - Public Access**:
+    *   If you want public access URLs, go to bucket **Settings** -> **Public Access**.
+    *   Add a custom domain or use the R2.dev subdomain.
+    *   Set `R2_PUBLIC_URL` to your public domain.
 
 ## 3. Frontend Deployment (Vercel)
 

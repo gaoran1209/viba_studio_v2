@@ -21,6 +21,7 @@ interface Job {
 
 export const DerivationView: React.FC = () => {
   const { t } = useLanguage();
+  const { config } = useModelConfig();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);

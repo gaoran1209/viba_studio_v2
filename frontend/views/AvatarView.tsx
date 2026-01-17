@@ -4,16 +4,8 @@ import { trainAvatar, fileToBase64 } from '../services/geminiService';
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useModelConfig } from '../contexts/ModelConfigContext';
-
-interface AvatarJob {
-  id: string;
-  files: File[];
-  previews: string[];
-  result?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  statusText?: string;
-  timestamp: number;
-}
+import { useJobs } from '../contexts/JobsContext';
+import { AvatarJob } from '../types';
 
 // Helper component for individual thumbnail
 const AvatarThumbnail: React.FC<{ file: File; onRemove: () => void }> = ({ file, onRemove }) => {
@@ -48,11 +40,11 @@ const AvatarThumbnail: React.FC<{ file: File; onRemove: () => void }> = ({ file,
 export const AvatarView: React.FC = () => {
   const { t } = useLanguage();
   const { config } = useModelConfig(); // Get config from context
+  const { avatarJobs: jobs, setAvatarJobs: setJobs } = useJobs();
   const [files, setFiles] = useState<File[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   
   // History
-  const [jobs, setJobs] = useState<AvatarJob[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,7 +76,7 @@ export const AvatarView: React.FC = () => {
     setFiles([]); // Clear input
 
     try {
-      const avatarUrl = await trainAvatar(newJob.files, (status) => {
+      const avatarUrl = await trainAvatar(newJob.files!, (status) => {
         let text = t.avatar.training;
         if (status === 'retrying') text = t.common.retrying;
         setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, statusText: text } : j));
@@ -113,7 +105,7 @@ export const AvatarView: React.FC = () => {
     setJobs(prev => prev.map(j => j.id === job.id ? { ...j, status: 'processing', statusText: t.avatar.training } : j));
 
     try {
-      const avatarUrl = await trainAvatar(job.files, (status) => {
+      const avatarUrl = await trainAvatar(job.files!, (status) => {
         let text = t.avatar.training;
         if (status === 'retrying') text = t.common.retrying;
         setJobs(prev => prev.map(j => j.id === job.id ? { ...j, statusText: text } : j));

@@ -183,7 +183,7 @@ export const TryOnView: React.FC = () => {
                          <img src={job.modelPreview} className="h-full w-20 object-cover rounded-lg bg-white" alt="Model" />
                          <div className="min-w-0">
                            <p className="text-xs font-bold text-gray-700">Model</p>
-                           <p className="text-[10px] text-gray-400 truncate">{job.modelFile.name}</p>
+                           <p className="text-[10px] text-gray-400 truncate">{job.modelFile?.name}</p>
                          </div>
                       </div>
                       <div className="flex items-center justify-center text-gray-300">
@@ -193,7 +193,7 @@ export const TryOnView: React.FC = () => {
                          <img src={job.clothPreview} className="h-full w-20 object-cover rounded-lg bg-white" alt="Cloth" />
                          <div className="min-w-0">
                            <p className="text-xs font-bold text-gray-700">Garment</p>
-                           <p className="text-[10px] text-gray-400 truncate">{job.clothFile.name}</p>
+                           <p className="text-[10px] text-gray-400 truncate">{job.clothFile?.name}</p>
                          </div>
                       </div>
                    </div>

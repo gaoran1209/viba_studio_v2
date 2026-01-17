@@ -4,25 +4,14 @@ import { Layers, Loader2, Download, Maximize2, Plus, X, RotateCw, Sparkles, Imag
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useModelConfig } from '../contexts/ModelConfigContext';
+import { useJobs } from '../contexts/JobsContext';
 import { fetchHistory, saveGeneration, deleteGeneration } from '../services/historyService';
-import { SkinTone } from '../types';
-
-interface Job {
-  id: string;
-  file: File;
-  previewUrl: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  results: string[];
-  description?: string;
-  creativity: number;
-  skinTone?: SkinTone;
-  statusText?: string;
-}
+import { SkinTone, DerivationJob } from '../types';
 
 export const DerivationView: React.FC = () => {
   const { t } = useLanguage();
   const { config } = useModelConfig();
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const { derivationJobs: jobs, setDerivationJobs: setJobs } = useJobs();
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   
@@ -50,7 +39,7 @@ export const DerivationView: React.FC = () => {
 
       try {
         const { images, description } = await generateDerivations(
-          job.file, 
+          job.file!, 
           job.creativity, 
           job.skinTone, 
           (status) => {
@@ -125,7 +114,7 @@ export const DerivationView: React.FC = () => {
   const handleStartGeneration = () => {
     if (!selectedFile || !selectedPreview) return;
 
-    const newJob: Job = {
+    const newJob: DerivationJob = {
       id: Math.random().toString(36).substr(2, 9),
       file: selectedFile,
       previewUrl: selectedPreview, // Pass the blob URL

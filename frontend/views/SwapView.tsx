@@ -4,22 +4,12 @@ import { generateSwap } from '../services/geminiService';
 import { Sparkles, Loader2, ArrowDown, X, Maximize2, Download, RefreshCw } from 'lucide-react';
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useModelConfig } from '../contexts/ModelConfigContext';
-
-interface SwapJob {
-  id: string;
-  sourceFile: File;
-  sceneFile: File;
-  sourcePreview: string;
-  scenePreview: string;
-  result?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  statusText?: string;
-  timestamp: number;
-}
+import { useJobs } from '../contexts/JobsContext';
+import { SwapJob } from '../types';
 
 export const SwapView: React.FC = () => {
   const { t } = useLanguage();
+  const { swapJobs: jobs, setSwapJobs: setJobs } = useJobs();
   
   // Input State
   const [sourceInput, setSourceInput] = useState<File | null>(null);
@@ -27,7 +17,6 @@ export const SwapView: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // History State
-  const [jobs, setJobs] = useState<SwapJob[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleGenerate = async () => {

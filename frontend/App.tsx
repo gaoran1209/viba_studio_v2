@@ -123,28 +123,50 @@ const App: React.FC = () => {
         <LanguageProvider>
           <AuthProvider>
             <ModelConfigProvider>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                
-                {/* Protected Dashboard Routes */}
-                <Route 
-                  element={
-                    <ProtectedRoute>
-                      <DashboardLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route path="/" element={<Navigate to="/derivation" replace />} />
-                  <Route path="/derivation" element={<DerivationView />} />
-                  <Route path="/avatar" element={<AvatarView />} />
-                  <Route path="/tryon" element={<TryOnView />} />
-                  <Route path="/swap" element={<SwapView />} />
-                  <Route path="/prompts" element={<SystemPromptsView />} />
-                </Route>
+              <JobsProvider>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  
+                  {/* Protected Dashboard Routes */}
+                  <Route 
+                    element={
+                      <ProtectedRoute>
+                        <DashboardLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/" element={<Navigate to="/derivation" replace />} />
+                    <Route path="/derivation" element={
+                      <Suspense fallback={<div className="flex h-full items-center justify-center">Loading...</div>}>
+                        <DerivationView />
+                      </Suspense>
+                    } />
+                    <Route path="/avatar" element={
+                      <Suspense fallback={<div className="flex h-full items-center justify-center">Loading...</div>}>
+                        <AvatarView />
+                      </Suspense>
+                    } />
+                    <Route path="/tryon" element={
+                      <Suspense fallback={<div className="flex h-full items-center justify-center">Loading...</div>}>
+                        <TryOnView />
+                      </Suspense>
+                    } />
+                    <Route path="/swap" element={
+                      <Suspense fallback={<div className="flex h-full items-center justify-center">Loading...</div>}>
+                        <SwapView />
+                      </Suspense>
+                    } />
+                    <Route path="/prompts" element={
+                      <Suspense fallback={<div className="flex h-full items-center justify-center">Loading...</div>}>
+                        <SystemPromptsView />
+                      </Suspense>
+                    } />
+                  </Route>
 
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </JobsProvider>
             </ModelConfigProvider>
           </AuthProvider>
         </LanguageProvider>

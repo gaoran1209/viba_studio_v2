@@ -3,6 +3,7 @@ import { Upload, Plus, Loader2, CheckCircle2, User, X, Download, Maximize2, Rota
 import { trainAvatar, fileToBase64 } from '../services/geminiService';
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useModelConfig } from '../contexts/ModelConfigContext';
 
 interface AvatarJob {
   id: string;

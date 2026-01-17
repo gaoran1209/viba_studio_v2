@@ -1,35 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
+import axios from 'axios';
 import { SkinTone } from "../types";
-
-const getClient = () => {
-  // Access process.env safely to prevent ReferenceError in non-polyfilled environments
-  let apiKey: string | undefined;
-  try {
-    apiKey = process.env.API_KEY;
-  } catch (e) {
-    console.error("Error accessing process.env", e);
-  }
-
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please ensure process.env.API_KEY is available.");
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-// Helper to convert File to Base64
-export const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remove the Data URL prefix (e.g., "data:image/jpeg;base64,")
-      const base64Data = result.split(',')[1];
-      resolve(base64Data);
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
 
 export const PROMPTS = {
   derivation_describe: `# Role
@@ -89,51 +59,38 @@ Subject centered.`,
   swap: "Compose the person from the first image into the scene provided by the second image. Harmonize lighting, shadows, and color tones so that the character appears to naturally belong in the environment. Keep the pose of the person in the second image unchanged, and choose a full-body or suitable composition according to the scene."
 };
 
-// Utility for Timeout and Retry
+// Helper to convert File to Base64
+export const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Remove the Data URL prefix (e.g., "data:image/jpeg;base64,")
+      const base64Data = result.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 type StatusCallback = (status: 'retrying' | 'processing_step1' | 'processing_step2') => void;
 
-async function withTimeoutAndRetry<T>(
-  operation: () => Promise<T>,
-  timeoutMs: number = 30000, // Default to 30s
-  maxRetries: number = 3,   
-  onStatusUpdate?: (status: 'retrying') => void
-): Promise<T> {
-  let attempt = 0;
-  
-  while (true) {
-    try {
-      if (attempt > 0) {
-        if (onStatusUpdate) onStatusUpdate('retrying');
-        // Exponential backoff: 2s, 4s, 8s...
-        const delay = Math.pow(2, attempt) * 1000;
-        console.log(`Retrying attempt ${attempt} after ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+// Get token helper
+const getToken = () => localStorage.getItem('token');
 
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
-      );
+// Create axios instance with auth header
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
+});
 
-      // Race the operation against the timeout
-      return await Promise.race([operation(), timeoutPromise]);
-
-    } catch (error: any) {
-      attempt++;
-      console.warn(`Attempt ${attempt} failed:`, error);
-      
-      // Stop retrying if we hit a quota limit or 429 error
-      if (error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
-        console.error("Quota exceeded, stopping retries.");
-        throw error;
-      }
-
-      if (attempt > maxRetries) {
-        throw error;
-      }
-      // Continue loop for retry
-    }
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-}
+  return config;
+});
 
 export const generateDerivations = async (
   baseImage: File,
@@ -142,176 +99,80 @@ export const generateDerivations = async (
   onStatusUpdate?: StatusCallback,
   config?: { textModel: string; imageModel: string }
 ): Promise<{ images: string[], description: string }> => {
-  const ai = getClient();
   const base64Data = await fileToBase64(baseImage);
   
-  // Step 1: Image to Text (Description)
   if (onStatusUpdate) onStatusUpdate('processing_step1');
-  
-  // Increased timeout to 60s, 2 retries
-  const description = await withTimeoutAndRetry(async () => {
-    const response = await ai.models.generateContent({
-      model: config?.textModel || 'gemini-3-pro-preview',
-      contents: {
-        parts: [
-          { inlineData: { mimeType: baseImage.type, data: base64Data } },
-          { text: PROMPTS.derivation_describe },
-        ],
-      },
+
+  try {
+    const response = await api.post('/generations/derivations', {
+      base64Data,
+      mimeType: baseImage.type,
+      intensity,
+      skinTone,
+      config
     });
-    return response.text || "A creative image.";
-  }, 60000, 2, (s) => onStatusUpdate && onStatusUpdate(s));
-
-  // Step 2: Text to Image (Generation)
-  if (onStatusUpdate) onStatusUpdate('processing_step2');
-  
-  const prompt = PROMPTS.derivation_generate(description, intensity, skinTone);
-
-  // Define the single generation task
-  const generateSingle = async () => {
-    // Increased timeout to 90s, 2 retries for image generation
-    return withTimeoutAndRetry(async () => {
-      const response = await ai.models.generateContent({
-        model: config?.imageModel || 'gemini-3-pro-image-preview',
-        contents: {
-          parts: [
-            { inlineData: { mimeType: baseImage.type, data: base64Data } },
-            { text: prompt },
-          ],
-        },
-        config: {
-          systemInstruction: 'Image aspect ratio 3:4',
-          imageConfig: {
-            imageSize: '1K',
-            aspectRatio: '3:4'
-          }
-        }
-      });
-
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-      throw new Error("No image generated");
-    }, 90000, 2, (s) => onStatusUpdate && onStatusUpdate(s)); 
-  };
-
-  // Restore parallel generation to ensure 4 images
-  // Using Promise.all so all 4 must succeed (retries handle flakiness)
-  const results = await Promise.all([
-    generateSingle(),
-    generateSingle(),
-    generateSingle(),
-    generateSingle()
-  ]);
-  
-  return { images: results, description };
+    
+    if (onStatusUpdate) onStatusUpdate('processing_step2');
+    
+    return response.data;
+  } catch (error) {
+    console.error("Generate Derivations Error:", error);
+    throw error;
+  }
 };
 
 export const trainAvatar = async (files: File[], onStatusUpdate?: StatusCallback, model?: string): Promise<string> => {
-  const ai = getClient();
-  
-  // Increased timeout to 120s, 2 retries
-  return withTimeoutAndRetry(async () => {
-    const parts: any[] = [];
-    for (const file of files) {
-      const b64 = await fileToBase64(file);
-      parts.push({
-        inlineData: {
-          mimeType: file.type,
-          data: b64
-        }
-      });
-    }
-    
-    parts.push({ text: PROMPTS.avatar });
+  const filesData = await Promise.all(files.map(async (file) => ({
+    data: await fileToBase64(file),
+    mimeType: file.type
+  })));
 
-    const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
-      contents: { parts },
-      config: {
-        systemInstruction: 'Image aspect ratio 3:4',
-        imageConfig: {
-          imageSize: '4K',
-          aspectRatio: '3:4'
-        }
-      }
+  try {
+    const response = await api.post('/generations/avatar', {
+      files: filesData,
+      model
     });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate avatar preview");
-  }, 120000, 2, (s) => onStatusUpdate && onStatusUpdate(s));
+    return response.data.image;
+  } catch (error) {
+    console.error("Train Avatar Error:", error);
+    throw error;
+  }
 };
 
 export const generateTryOn = async (modelFile: File, garmentFile: File, onStatusUpdate?: StatusCallback, model?: string): Promise<string> => {
-  const ai = getClient();
   const modelB64 = await fileToBase64(modelFile);
   const garmentB64 = await fileToBase64(garmentFile);
 
-  // Increased timeout to 120s, 2 retries
-  return withTimeoutAndRetry(async () => {
-    const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [
-          { inlineData: { mimeType: modelFile.type, data: modelB64 } },
-          { inlineData: { mimeType: garmentFile.type, data: garmentB64 } },
-          { text: PROMPTS.tryOn }
-        ]
-      },
-      config: {
-        systemInstruction: 'Image aspect ratio 3:4',
-        imageConfig: {
-          imageSize: '2K',
-          aspectRatio: '3:4'
-        }
-      }
+  try {
+    const response = await api.post('/generations/try-on', {
+      modelB64,
+      modelMime: modelFile.type,
+      garmentB64,
+      garmentMime: garmentFile.type,
+      model
     });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate try-on image");
-  }, 120000, 2, (s) => onStatusUpdate && onStatusUpdate(s));
+    return response.data.image;
+  } catch (error) {
+    console.error("Try On Error:", error);
+    throw error;
+  }
 };
 
 export const generateSwap = async (sourceFile: File, sceneFile: File, onStatusUpdate?: StatusCallback, model?: string): Promise<string> => {
-  const ai = getClient();
   const sourceB64 = await fileToBase64(sourceFile);
   const sceneB64 = await fileToBase64(sceneFile);
 
-  // Increased timeout to 120s, 2 retries
-  return withTimeoutAndRetry(async () => {
-    const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [
-          { inlineData: { mimeType: sourceFile.type, data: sourceB64 } },
-          { inlineData: { mimeType: sceneFile.type, data: sceneB64 } },
-          { text: PROMPTS.swap }
-        ]
-      },
-      config: {
-        systemInstruction: 'Image aspect ratio 3:4',
-        imageConfig: {
-          imageSize: '2K',
-          aspectRatio: '3:4'
-        }
-      }
+  try {
+    const response = await api.post('/generations/swap', {
+      sourceB64,
+      sourceMime: sourceFile.type,
+      sceneB64,
+      sceneMime: sceneFile.type,
+      model
     });
-
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate swap image");
-  }, 120000, 2, (s) => onStatusUpdate && onStatusUpdate(s));
+    return response.data.image;
+  } catch (error) {
+    console.error("Swap Error:", error);
+    throw error;
+  }
 };

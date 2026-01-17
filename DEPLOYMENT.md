@@ -1,61 +1,69 @@
-# Deployment Guide
+# Viba Studio V2 - Deployment Guide
 
-This project consists of a **Frontend** (React/Vite) and a **Backend** (Node/Express).
-
-## Prerequisites
-
-- **GitHub Account**: For version control.
-- **Vercel Account**: For frontend deployment.
-- **Render Account**: For backend deployment.
-- **Supabase Account**: For the database.
+This guide details how to deploy the Viba Studio V2 application to Vercel (Frontend), Render (Backend), and Supabase (Database).
 
 ## 1. Database Setup (Supabase)
 
-1. Create a new project in Supabase.
-2. Get the connection string from Settings -> Database -> Connection String (Node.js).
-3. It should look like: `postgresql://postgres:[PASSWORD]@db.supabase.co:5432/postgres`.
-4. The backend will automatically create tables (`users`, `generation_history`) on first startup.
+1.  **Create Project**: Log in to Supabase and create a new project.
+2.  **Get Credentials**: Go to **Settings** -> **Database**.
+    *   Copy the **Connection String** (Node.js/Transaction Mode). It looks like:
+        `postgresql://postgres:[PASSWORD]@db.[ref].supabase.co:5432/postgres`
+    *   *Note*: Ensure you disable "Use connection pooling" if using Sequelize with SSL locally, or keep it enabled for production transaction pooling. Direct connection is usually fine for this scale.
+3.  **Permissions**:
+    *   The application uses Sequelize with `sync({ alter: true })`, so the database user needs `CREATE` and `ALTER` table permissions. The default `postgres` user has these.
 
 ## 2. Backend Deployment (Render)
 
-1. Connect your GitHub repository to Render.
-2. Click **New +** -> **Web Service**.
-3. Select your repository.
-4. **Root Directory**: `backend`
-5. **Build Command**: `npm install && npm run build`
-6. **Start Command**: `npm start`
-7. **Environment Variables**:
-   - `DATABASE_URL`: Your Supabase connection string.
-   - `JWT_SECRET`: A secure random string for tokens.
-   - `PORT`: `3001` (or let Render assign it, code handles `process.env.PORT`).
+The backend is a Node.js Express application handling Auth and AI Generation.
 
-Alternatively, use the provided `render.yaml` blueprint.
+### Option A: Blueprints (Recommended)
+1.  In Render Dashboard, go to **Blueprints**.
+2.  Connect your repo.
+3.  Render will detect `render.yaml`.
+4.  **Important**: You must manually input the environment variables when prompted or in the dashboard after creation.
+
+### Option B: Manual Web Service
+1.  **New Web Service** -> Connect Repository.
+2.  **Root Directory**: `backend`
+3.  **Build Command**: `npm install && npm run build`
+4.  **Start Command**: `npm start`
+5.  **Environment Variables**:
+    *   `DATABASE_URL`: (From Supabase)
+    *   `JWT_SECRET`: Generate a strong random string (e.g., `openssl rand -hex 32`).
+    *   `GEMINI_API_KEY`: Your Google Gemini API Key.
+    *   `PORT`: `3001` (Optional, Render sets this automatically).
 
 ## 3. Frontend Deployment (Vercel)
 
-1. Connect your GitHub repository to Vercel.
-2. Import the project.
-3. **Root Directory**: `frontend` (Edit -> Select `frontend` folder).
-4. **Framework Preset**: Vite (should detect automatically).
-5. **Environment Variables**:
-   - `VITE_API_URL`: The URL of your deployed Backend (e.g., `https://viba-studio-api.onrender.com/api/v1`).
-   - `VITE_GEMINI_API_KEY`: (Optional) If you want a default key, otherwise users provide their own.
+The frontend is a Vite + React application.
 
-## 4. Local Development
+1.  **New Project** -> Import Repository.
+2.  **Root Directory**: Select `frontend`.
+3.  **Framework Preset**: Vite.
+4.  **Environment Variables**:
+    *   `VITE_API_URL`: The URL of your deployed Backend (e.g., `https://viba-studio-api.onrender.com/api/v1`).
+        *   *Note*: Do NOT add a trailing slash.
+5.  **Deploy**.
 
-1. **Backend**:
-   ```bash
-   cd backend
-   cp .env.example .env # Set your DB URL
-   npm install
-   npm run dev
-   ```
+## 4. Verification Checklist
 
-2. **Frontend**:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+After deployment, perform these checks:
 
-3. Access Frontend at `http://localhost:3000`.
+### API & Database
+1.  **Health Check**: Visit `https://<BACKEND_URL>/health`. Should return `{"status":"ok"}`.
+2.  **Auth**: Try to Register a new user. This verifies:
+    *   Database connection (User creation).
+    *   JWT generation.
+3.  **AI Generation**:
+    *   Upload an image in "Derivations".
+    *   Click "Generate".
+    *   This verifies:
+        *   Frontend -> Backend connectivity (`VITE_API_URL`).
+        *   Backend -> Gemini API connectivity (`GEMINI_API_KEY`).
+        *   File handling (Base64 transfer).
+
+## 5. Troubleshooting
+
+*   **CORS Errors**: If Frontend cannot talk to Backend, check `backend/src/index.ts` or `cors` config. Ensure Vercel domain is allowed.
+*   **Database Connection Error**: Check if `ssl: { rejectUnauthorized: false }` is needed for Supabase (it is currently enabled in code).
+*   **Build Failures**: Check `package.json` dependencies.

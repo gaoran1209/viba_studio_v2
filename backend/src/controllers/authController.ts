@@ -27,9 +27,9 @@ export const register = async (req: Request, res: Response) => {
 
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
 
-    res.status(201).json({ 
-      token, 
-      user: { id: user.id, email: user.email, full_name: user.full_name } 
+    res.status(201).json({
+      token,
+      user: { id: user.id, email: user.email, full_name: user.full_name }
     });
   } catch (error) {
     console.error(error);
@@ -40,25 +40,30 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    console.log(`[Auth] Login attempt for: ${email}`);
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
+      console.log(`[Auth] User not found: ${email}`);
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
+    console.log(`[Auth] User found, verifying password for: ${email}`);
     const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
+      console.log(`[Auth] Invalid password for: ${email}`);
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
+    console.log(`[Auth] Password verified, generating token for: ${email}`);
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '7d' });
 
-    res.json({ 
-      token, 
-      user: { id: user.id, email: user.email, full_name: user.full_name } 
+    res.json({
+      token,
+      user: { id: user.id, email: user.email, full_name: user.full_name }
     });
   } catch (error) {
-    console.error(error);
+    console.error('[Auth] Login error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };

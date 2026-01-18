@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,6 +11,13 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,13 +26,21 @@ export const LoginPage: React.FC = () => {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-      const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const response = await axios.post(`${API_URL}/auth/login`, { email, password }, {
+        timeout: 15000 // 15 seconds timeout
+      });
       login(response.data.token, response.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to login');
+      if (err.code === 'ECONNABORTED') {
+        setError('Login timed out. Please check your connection or try again.');
+      } else {
+        setError(err.response?.data?.error || 'Failed to login');
+      }
     } finally {
-      setLoading(false);
+      if (mounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -51,7 +66,7 @@ export const LoginPage: React.FC = () => {
                 {error}
               </div>
             )}
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address

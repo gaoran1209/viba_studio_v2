@@ -20,15 +20,20 @@ export const RegisterPage: React.FC = () => {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-      const response = await axios.post(`${API_URL}/auth/register`, { 
-        email, 
+      const response = await axios.post(`${API_URL}/auth/register`, {
+        email,
         password,
         full_name: fullName
       });
       login(response.data.token, response.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to register');
+      console.error('Registration error:', err);
+      if (err.code === 'ERR_NETWORK') {
+        setError('Cannot connect to server. Please ensure the backend is running.');
+      } else {
+        setError(err.response?.data?.error || 'Failed to register');
+      }
     } finally {
       setLoading(false);
     }
@@ -77,7 +82,7 @@ export const RegisterPage: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address

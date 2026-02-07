@@ -24,8 +24,8 @@ services:
     container_name: viba_backend
     restart: always
     # Ports not exposed to host, only internal network (accessed via Nginx proxy)
-    # ports:
-    #   - "3001:3001"
+    ports:
+      - "3001:3001"
     environment:
       - PORT=3001
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-viba_db}

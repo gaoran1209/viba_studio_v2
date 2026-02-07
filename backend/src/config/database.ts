@@ -7,6 +7,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is missing');
 }
 
+// SSL Configuration: Required for Render/Supabase, but must be disabled for local Docker
+const sslConfig = process.env.DB_SSL === 'true' ? {
+  require: true,
+  rejectUnauthorized: false
+} : undefined;
+
 export const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   logging: false,
@@ -17,10 +23,7 @@ export const sequelize = new Sequelize(process.env.DATABASE_URL, {
     idle: 10000
   },
   dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
-    },
+    ...(sslConfig && { ssl: sslConfig }),
     statement_timeout: 10000 // 10 seconds timeout for queries
   }
 });

@@ -120,13 +120,21 @@ jobs:
             APP_SERVICES="backend frontend"
 
             if docker compose version >/dev/null 2>&1; then
+              USE_COMPOSE_V2="true"
               COMPOSE_CMD="docker compose --env-file .env"
             else
+              USE_COMPOSE_V2="false"
               COMPOSE_CMD="docker-compose --env-file .env"
             fi
 
             # Deploy stateless app services only; do not recreate db on each release.
             $COMPOSE_CMD pull $APP_SERVICES
+
+            # Workaround for docker-compose v1.29.2 KeyError('ContainerConfig') on recreate path.
+            if [ "$USE_COMPOSE_V2" = "false" ]; then
+              docker rm -f viba_backend viba_frontend >/dev/null 2>&1 || true
+            fi
+
             $COMPOSE_CMD up -d --no-deps --remove-orphans $APP_SERVICES
 
             # First deployment fallback: create db if missing.

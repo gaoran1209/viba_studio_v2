@@ -133,15 +133,33 @@ jobs:
               fi
             }
 
-            # Remove stale db containers left by old broken compose runs
-            DB_IDS="$(docker ps -aq --filter name=viba_db)"
-            if [ -n "$DB_IDS" ]; then
-              echo "Removing stale db containers..."
-              docker rm -f $DB_IDS || true
+            # IMPORTANT: Do NOT remove the db container if it's running with existing data.
+            # PostgreSQL only initializes credentials on first run. Removing and recreating
+            # the container while postgres-data volume exists causes password mismatch.
+            # Only remove stopped/exited db containers.
+            STOPPED_DB_IDS="$(docker ps -aq --filter name=viba_db --filter status=exited)"
+            if [ -n "$STOPPED_DB_IDS" ]; then
+              echo "Removing stopped db containers..."
+              docker rm -f $STOPPED_DB_IDS || true
             fi
 
             # Ensure db exists (safe for repeat runs with compose v2).
             compose up -d db
+
+            # Wait for database to be ready before starting backend
+            echo "Waiting for database to be ready..."
+            for i in $(seq 1 30); do
+              if docker exec viba_db pg_isready -U postgres >/dev/null 2>&1; then
+                echo "Database is ready."
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "Database failed to become ready."
+                docker logs --tail 50 viba_db || true
+                exit 1
+              fi
+              sleep 2
+            done
 
             # Deploy stateless app services.
             compose pull $APP_SERVICES

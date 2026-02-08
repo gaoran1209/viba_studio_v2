@@ -117,12 +117,21 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
+            APP_SERVICES="backend frontend"
+
             if docker compose version >/dev/null 2>&1; then
-              docker compose --env-file .env pull
-              docker compose --env-file .env up -d --remove-orphans
+              COMPOSE_CMD="docker compose --env-file .env"
             else
-              docker-compose --env-file .env pull
-              docker-compose --env-file .env up -d --remove-orphans
+              COMPOSE_CMD="docker-compose --env-file .env"
+            fi
+
+            # Deploy stateless app services only; do not recreate db on each release.
+            $COMPOSE_CMD pull $APP_SERVICES
+            $COMPOSE_CMD up -d --no-deps --remove-orphans $APP_SERVICES
+
+            # First deployment fallback: create db if missing.
+            if ! docker ps -a --format '{{.Names}}' | grep -q '^viba_db$'; then
+              $COMPOSE_CMD up -d db
             fi
 
             # Health check backend before reporting deployment success

@@ -1,48 +1,187 @@
-# Code Review Report - Viba Studio V2
+# Viba Studio V2 - Code Review & Remediation Plan (Updated)
 
-**Date:** 2026-01-17
-**Reviewer:** Trae AI
+**Date**: 2026-02-08  
+**Updated By**: Codex  
+**Focus**:
+1. 功能可用性优先（尤其是注册/登录与核心生成链路）
+2. 本地改代码后通过 GitHub 自动部署到 EC2 Docker
+3. 低性能实例（如 t3.small）下的稳定运行
 
-## 1. Executive Summary
-The codebase is a full-stack application (React + Node.js) for AI image generation. While the functional core appears solid, there is a **Critical Security Vulnerability** regarding API Key management that must be addressed before production deployment. The architecture is clean, but input validation and error handling need strengthening.
+---
 
-## 2. Critical Security Issues (Must Fix)
+## 0. 本次更新说明
 
-### 🚨 API Key Exposure in Frontend
-- **Location:** `frontend/vite.config.ts` and `frontend/services/geminiService.ts`
-- **Issue:** The Google Gemini API Key is injected into the frontend bundle via `define`. This allows any user to inspect the JavaScript code and steal your API quota.
-- **Recommendation:** Move all interaction with Google Gemini API to the backend. The frontend should send requests to the backend, which then proxies them to Google using the secure server-side environment variable.
+本版本基于仓库代码静态审查 + 本地构建结果更新，不再沿用不够准确的结论。  
+说明：
+- 本地环境无法直接访问你的线上域名（DNS 解析受限），因此“线上运行态”结论来自代码证据 + 你提供的现象（注册不可用）。
+- 前端、后端本地构建均通过。
 
-### 🚨 Database SSL Verification Disabled
-- **Location:** `backend/src/config/database.ts`
-- **Issue:** `ssl: { rejectUnauthorized: false }` allows Man-in-the-Middle attacks.
-- **Recommendation:** Enable `rejectUnauthorized: true` in production and provide the correct CA certificate (e.g., for Render/Supabase).
+---
 
-### ⚠️ JWT Storage
-- **Location:** `frontend/contexts/AuthContext.tsx`
-- **Issue:** JWTs are stored in `localStorage`, making them vulnerable to XSS attacks.
-- **Recommendation:** Store tokens in `HttpOnly` `Secure` cookies.
+## 1. 目标与验收标准
 
-## 3. Code Quality & Best Practices
+### 1.1 当前阶段目标
+1. 保证核心功能可用（注册、登录、核心生成、历史可读）
+2. `git push main` 后自动部署到 EC2 并可用
+3. 性能要求“够用即可”，优先稳定
 
-### Backend
-- **Input Validation:** `authController.ts` lacks strong validation for email formats and password complexity.
-  - *Fix:* Use `zod` or `joi` for request validation.
-- **Type Safety:** Usage of `any` in `authMiddleware.ts` and controllers reduces TypeScript's benefits.
-  - *Fix:* Define `AuthRequest` extending `Request` to include `user` property.
-- **Database Sync:** `sequelize.sync({ alter: true })` is used.
-  - *Fix:* Use Sequelize Migrations for production to prevent data loss.
+### 1.2 验收标准
+1. 访问 `http://<EC2>:8081/` 可完成注册与登录
+2. `/api/v1/auth/register` 返回 201（非 500）
+3. 部署流水线在失败时明确失败，不出现“假成功”
+4. 生成历史图片不会在短时间后失效
 
-### Frontend
-- **Business Logic:** `geminiService.ts` contains heavy business logic that belongs in the backend.
-- **Hardcoded URLs:** `AuthContext.tsx` has a hardcoded fallback to `localhost:3001`.
-  - *Fix:* Ensure `VITE_API_URL` is consistently used.
+---
 
-## 4. Performance Optimization
-- **Parallel Generation:** The use of `Promise.all` in `generateDerivations` is good for performance.
-- **Asset Optimization:** Ensure images are optimized before upload to save bandwidth (currently sending raw Base64).
+## 2. 关键发现（按严重级别）
 
-## 5. Next Steps for Deployment
-1. **Refactor Gemini Service:** Move logic to backend `generationController`.
-2. **Environment Variables:** Securely configure `GEMINI_API_KEY` only on the backend server (Render).
-3. **Database:** Initialize Supabase and obtain connection string.
+## P0（立即修复）
+
+### P0-1 注册失败的高概率根因：`JWT_SECRET` 在部署链路中未被可靠注入
+**证据**
+- `backend/src/controllers/authController.ts:28`、`backend/src/controllers/authController.ts:59`  
+  `jwt.sign(..., process.env.JWT_SECRET as string, ...)` 直接使用环境变量。
+- `.github/workflows/deploy.yml:63-101`  
+  仅同步 `docker-compose.yml` 并重启容器，没有创建/更新 EC2 运行时 `.env`。
+- `docker-compose.yml:32`  
+  后端依赖 `JWT_SECRET=${JWT_SECRET}`。
+
+**影响**
+- `JWT_SECRET` 为空时注册/登录会在签发 token 阶段触发 500。
+
+**结论**
+- 与“线上注册不可用”高度一致，优先级 P0。
+
+---
+
+### P0-2 历史图片可用性缺陷：R2 记录了 URL 而非 Key，导致过期与清理失败
+**证据**
+- `backend/src/controllers/generationController.ts:24` 上传后写入 `getImageUrl(key)`（URL）
+- `backend/src/services/r2Service.ts:149` 签名 URL 默认 1 小时过期
+- `backend/src/controllers/generationController.ts:316` 仅当字段像 `users/...` key 才刷新 URL
+- `backend/src/controllers/generationController.ts:366` 删除时也仅处理 key
+
+**影响**
+- 历史图一段时间后打不开；删除历史无法回收对象存储。
+
+---
+
+## P1（尽快修复）
+
+### P1-1 Derivation 重复落库，且前端写入了不可持久的 blob URL
+**证据**
+- 后端接口已自动保存历史：`backend/src/controllers/generationController.ts:66`
+- 前端又调用一次保存：`frontend/views/DerivationView.tsx:67`
+- 前端保存输入图使用 `blob:` 预览地址：`frontend/views/DerivationView.tsx:69`
+- 后端只识别 `data:` 进行 R2 上传：`backend/src/controllers/generationController.ts:259`
+
+**影响**
+- 历史重复、部分记录输入图不可回放。
+
+---
+
+### P1-2 自动部署缺少健康检查与失败判定
+**证据**
+- `.github/workflows/deploy.yml:95-101` 只有 `pull/up/prune`，没有健康检查和失败条件。
+
+**影响**
+- 服务未真正可用时，流水线可能仍显示成功。
+
+---
+
+## P2（中期修复）
+
+### P2-1 `docker-compose` 命令兼容性风险
+**证据**
+- 使用 `docker-compose`：`.github/workflows/deploy.yml:95`
+- 新环境常见 `docker compose` 插件形态。
+
+### P2-2 `deploy.resources` 在非 Swarm 模式通常不生效
+**证据**
+- `docker-compose.yml:17-20` 使用 `deploy.resources.limits`。
+
+### P2-3 生产环境使用 `sequelize.sync({ alter: true })`
+**证据**
+- `backend/src/config/database.ts:36`
+
+**影响**
+- 启动时隐式改表，增加线上不确定性。
+
+---
+
+## P3（可优化）
+
+### P3-1 历史管理架构不一致
+**证据**
+- TryOn 使用局部 state：`frontend/views/TryOnView.tsx:30`
+- Derivation 引入未用方法：`frontend/views/DerivationView.tsx:8`
+
+---
+
+## 3. 修复计划（更新后）
+
+## 阶段 A（今天完成，先恢复注册可用）
+
+1. 后端启动前校验关键环境变量（至少 `DATABASE_URL`、`JWT_SECRET`）
+2. 部署工作流增加 EC2 `.env` 注入/更新（来自 GitHub Secrets）
+3. 部署后执行健康检查，失败则让 workflow 直接失败
+4. 在 EC2 验证注册接口可用
+
+**验收**
+- `POST /api/v1/auth/register` 返回 201
+- 前端注册页可成功跳转登录态
+
+---
+
+## 阶段 B（本周内，修数据正确性）
+
+1. R2 入库改为存 `key`，读取时动态换 URL
+2. 删除历史时基于 key 清理 R2 对象
+3. 去掉 Derivation 前端二次 `saveGeneration`（以后端自动保存为准）
+
+**验收**
+- 历史图片 24 小时后仍可访问
+- 删除历史后 R2 对象同步清理
+- 不再出现重复历史记录
+
+---
+
+## 阶段 C（稳定性与运维）
+
+1. workflow 命令兼容 `docker compose`
+2. 明确资源限制策略（非 Swarm 不依赖 `deploy.resources`）
+3. 从 `sync({ alter: true })` 迁移到 migration
+
+---
+
+## 4. 针对“注册不可用”的最小排查清单（EC2）
+
+```bash
+# 1) 查看关键环境变量是否存在
+docker exec viba_backend sh -lc 'echo "JWT_SECRET=${JWT_SECRET:-<empty>}"; echo "DATABASE_URL=${DATABASE_URL:+set}"'
+
+# 2) 查看后端错误日志
+docker logs viba_backend --tail 200
+
+# 3) 从机器本地直测注册接口
+curl -i -X POST http://localhost:8081/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"check@example.com","password":"test123456","full_name":"Check"}'
+```
+
+如果第 1 步显示 `JWT_SECRET=<empty>`，即可直接判定当前注册失败主因。
+
+---
+
+## 5. 建议落地顺序（按收益/风险）
+
+1. 先修部署环境变量注入 + 启动校验（立即恢复注册）
+2. 再修 R2 key/url 与重复历史（避免后续数据债）
+3. 最后做迁移与部署健壮性优化（compose/migration/资源限制）
+
+---
+
+## 6. 当前结论
+
+现阶段最关键的不是继续加功能，而是先把“部署后必可注册”这条链路固定下来。  
+在你当前代码下，**`JWT_SECRET` 注入缺失**是导致“线上注册不可用”的最高概率问题；同时，R2 历史存储逻辑存在确定性可用性缺陷，建议在注册恢复后立即处理。

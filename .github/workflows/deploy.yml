@@ -52,13 +52,38 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        # We need checkout to copy docker-compose.yml to server? 
-        # Actually, we can just scp the file or create it.
-        # Let's SCP the docker-compose.yml to ensures it's up to date.
 
       - name: Lowercase Repo Name
         run: |
           echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Prepare server environment file
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          EC2_ENV_FILE: ${{ secrets.EC2_ENV_FILE }}
+          REPO_LOWER: ${{ env.REPO_LOWER }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: EC2_ENV_FILE,REPO_LOWER
+          script: |
+            set -euo pipefail
+
+            if [ -z "${EC2_ENV_FILE:-}" ]; then
+              echo "EC2_ENV_FILE secret is required."
+              exit 1
+            fi
+
+            mkdir -p ~/viba-studio
+            printf "%s\n" "$EC2_ENV_FILE" > ~/viba-studio/.env
+            chmod 600 ~/viba-studio/.env
+
+            if grep -q '^IMAGE_REPO=' ~/viba-studio/.env; then
+              sed -i "s|^IMAGE_REPO=.*|IMAGE_REPO=ghcr.io/${REPO_LOWER}|" ~/viba-studio/.env
+            else
+              echo "IMAGE_REPO=ghcr.io/${REPO_LOWER}" >> ~/viba-studio/.env
+            fi
 
       - name: Copy docker-compose.yml to Server
         uses: appleboy/scp-action@v0.1.7
@@ -71,31 +96,47 @@ jobs:
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GHCR_USERNAME,GHCR_TOKEN
           script: |
+            set -euo pipefail
+
             # Navigate to project dir
             cd ~/viba-studio
-            
-            # Login to GHCR (using the Action's temporary token passed as env is tricky)
-            # WORKAROUND: We use the docker credentials from the build job? No.
-            # We use the PAT if provided, or we assume public? 
-            # Wait, GITHUB_TOKEN is not available inside the SSH session unless we pass it.
-            # But passing it securely is hard.
-            # EASIER: If the repo is private, the user MUST use a PAT.
-            # OR we can pass it:
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
-            # Set the Image Repo Env Var
-            export IMAGE_REPO=ghcr.io/${{ env.REPO_LOWER }}
-            
-            # Pull latest images
-            docker-compose pull
-            
-            # Restart containers
-            docker-compose up -d --remove-orphans
-            
-            # Cleanup old images
+
+            if [ -z "${GHCR_USERNAME:-}" ] || [ -z "${GHCR_TOKEN:-}" ]; then
+              echo "GHCR_USERNAME and GHCR_TOKEN secrets are required."
+              exit 1
+            fi
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+
+            if docker compose version >/dev/null 2>&1; then
+              docker compose --env-file .env pull
+              docker compose --env-file .env up -d --remove-orphans
+            else
+              docker-compose --env-file .env pull
+              docker-compose --env-file .env up -d --remove-orphans
+            fi
+
+            # Health check backend before reporting deployment success
+            for i in $(seq 1 30); do
+              if curl -fsS http://localhost:3001/health >/dev/null; then
+                echo "Backend health check passed."
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "Backend health check failed."
+                docker logs --tail 200 viba_backend || true
+                exit 1
+              fi
+              sleep 2
+            done
+
             docker image prune -f

@@ -9,6 +9,14 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const REQUIRED_ENV_VARS = ['JWT_SECRET'];
+
+const validateRequiredEnv = () => {
+  const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+};
 
 // Middleware
 app.use(cors());
@@ -25,10 +33,14 @@ app.get('/health', (req, res) => {
 
 // Start Server
 const startServer = async () => {
+  validateRequiredEnv();
   await connectDB();
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
 };
 
-startServer();
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
+});

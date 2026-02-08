@@ -15,6 +15,7 @@
 说明：
 - 本地环境无法直接访问你的线上域名（DNS 解析受限），因此“线上运行态”结论来自代码证据 + 你提供的现象（注册不可用）。
 - 前端、后端本地构建均通过。
+- 本次更新新增：密钥泄露风险、历史保存混合格式上传缺陷、前端本地持久化容量风险、ObjectURL 释放问题。
 
 ---
 
@@ -36,6 +37,16 @@
 ## 2. 关键发现（按严重级别）
 
 ## P0（立即修复）
+
+### P0-0 生产密钥已被提交到仓库（最高优先级安全风险）
+**证据**
+- `backend/.env` 存在真实的 `DATABASE_URL`、`R2_*`、`JWT_SECRET` 等敏感信息。
+
+**影响**
+- 任何获得仓库访问权限的人都可直接访问数据库与对象存储；若仓库被公开或泄露，后果严重。
+
+**结论**
+- 必须立即移除该文件、清理 git 历史并轮换全部密钥。
 
 ### P0-1 注册失败的高概率根因：`JWT_SECRET` 在部署链路中未被可靠注入
 **证据**
@@ -107,6 +118,22 @@
 **影响**
 - 启动时隐式改表，增加线上不确定性。
 
+### P2-4 `createGeneration` 混合格式上传导致非 base64 被当作 base64 上传
+**证据**
+- `backend/src/controllers/generationController.ts:256-278`  
+  只要检测到任意 `data:`，就把整个数组交给 `uploadImagesToR2`。
+
+**影响**
+- 传入已是 URL 的项会被当作 base64 处理，覆盖/损坏历史记录。
+
+### P2-5 前端本地持久化可能因 base64 体积过大失败
+**证据**
+- `frontend/contexts/JobsContext.tsx:47-65`  
+  `localStorage.setItem` 未做 try/catch，且可能写入大体积 base64。
+
+**影响**
+- 超过浏览器配额会持续抛错并导致历史持久化失败。
+
 ---
 
 ## P3（可优化）
@@ -115,6 +142,14 @@
 **证据**
 - TryOn 使用局部 state：`frontend/views/TryOnView.tsx:30`
 - Derivation 引入未用方法：`frontend/views/DerivationView.tsx:8`
+
+### P3-2 ObjectURL 未释放，可能导致内存泄漏
+**证据**
+- `frontend/components/ImageUpload.tsx:28-35`  
+  `URL.createObjectURL` 未在清理或卸载时 `revoke`。
+
+**影响**
+- 频繁上传或切换图片会累积内存占用。
 
 ---
 
@@ -151,6 +186,7 @@
 1. workflow 命令兼容 `docker compose`
 2. 明确资源限制策略（非 Swarm 不依赖 `deploy.resources`）
 3. 从 `sync({ alter: true })` 迁移到 migration
+4. 清理仓库中的敏感文件并轮换密钥
 
 ---
 

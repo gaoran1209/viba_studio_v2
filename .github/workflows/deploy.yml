@@ -122,13 +122,14 @@ jobs:
             compose() {
               if docker compose version >/dev/null 2>&1; then
                 docker compose --env-file .env "$@"
+              elif command -v docker-compose >/dev/null 2>&1; then
+                docker-compose --env-file .env "$@"
               else
-                docker run --rm \
-                  -v /var/run/docker.sock:/var/run/docker.sock \
-                  -v "$PWD:$PWD" \
-                  -w "$PWD" \
-                  docker/compose:2 \
-                  --env-file .env "$@"
+                echo "Installing docker-compose..."
+                mkdir -p $HOME/.local/bin
+                curl -SL https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-x86_64 -o $HOME/.local/bin/docker-compose
+                chmod +x $HOME/.local/bin/docker-compose
+                $HOME/.local/bin/docker-compose --env-file .env "$@"
               fi
             }
 

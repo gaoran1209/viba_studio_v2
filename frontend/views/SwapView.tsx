@@ -4,11 +4,13 @@ import { generateSwap } from '../services/geminiService';
 import { Sparkles, Loader2, ArrowDown, X, Maximize2, Download, RefreshCw } from 'lucide-react';
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useModelConfig } from '../contexts/ModelConfigContext';
 import { useJobs } from '../contexts/JobsContext';
 import { SwapJob } from '../types';
 
 export const SwapView: React.FC = () => {
   const { t } = useLanguage();
+  const { config } = useModelConfig();
   const { swapJobs: jobs, setSwapJobs: setJobs } = useJobs();
   
   // Input State
@@ -43,7 +45,7 @@ export const SwapView: React.FC = () => {
           let text = t.common.processing;
           if (status === 'retrying') text = t.common.retrying;
           setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, statusText: text } : j));
-        });
+        }, config.swap);
         
         setJobs(prev => prev.map(j => j.id === newJob.id ? { 
           ...j, 
@@ -171,7 +173,7 @@ export const SwapView: React.FC = () => {
                          <img src={job.sourcePreview} className="h-full w-20 object-cover rounded-lg bg-white" alt="Source" />
                          <div className="min-w-0">
                            <p className="text-xs font-bold text-gray-700">Source</p>
-                           <p className="text-[10px] text-gray-400 truncate">{job.sourceFile.name}</p>
+                           <p className="text-[10px] text-gray-400 truncate">{job.sourceFile?.name || 'Source'}</p>
                          </div>
                       </div>
                       <div className="flex items-center justify-center text-gray-300">
@@ -181,7 +183,7 @@ export const SwapView: React.FC = () => {
                          <img src={job.scenePreview} className="h-full w-20 object-cover rounded-lg bg-white" alt="Scene" />
                          <div className="min-w-0">
                            <p className="text-xs font-bold text-gray-700">Scene</p>
-                           <p className="text-[10px] text-gray-400 truncate">{job.sceneFile.name}</p>
+                           <p className="text-[10px] text-gray-400 truncate">{job.sceneFile?.name || 'Scene'}</p>
                          </div>
                       </div>
                    </div>

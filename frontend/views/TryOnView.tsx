@@ -5,29 +5,20 @@ import { Shirt, Loader2, ArrowDown, Sparkles, X, Maximize2, Download } from 'luc
 import { ImageModal } from '../components/ImageModal';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useModelConfig } from '../contexts/ModelConfigContext';
-
-interface TryOnJob {
-  id: string;
-  modelFile: File;
-  clothFile: File;
-  modelPreview: string;
-  clothPreview: string;
-  result?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  statusText?: string;
-  timestamp: number;
-}
+import { useJobs } from '../contexts/JobsContext';
+import { TryOnJob } from '../types';
 
 export const TryOnView: React.FC = () => {
   const { t } = useLanguage();
-  
+  const { config } = useModelConfig();
+  const { tryOnJobs: jobs, setTryOnJobs: setJobs } = useJobs();
+
   // Input State
   const [modelInput, setModelInput] = useState<File | null>(null);
   const [clothInput, setClothInput] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // History State
-  const [jobs, setJobs] = useState<TryOnJob[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleGenerate = async () => {
@@ -54,9 +45,9 @@ export const TryOnView: React.FC = () => {
       const resultUrl = await generateTryOn(modelInput, clothInput, (status) => {
          let text = t.common.processing;
          if (status === 'retrying') text = t.common.retrying;
-         
+
          setJobs(prev => prev.map(j => j.id === newJob.id ? { ...j, statusText: text } : j));
-      });
+      }, config.tryOn);
 
       setJobs(prev => prev.map(j => j.id === newJob.id ? { 
         ...j, 

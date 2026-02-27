@@ -83,7 +83,9 @@ export const generateDerivations = async (req: any, res: Response) => {
     }
   } catch (error: any) {
     console.error('Derivation error:', error);
-    res.status(500).json({ error: error.message || 'Generation failed' });
+    const statusCode = error?.message?.includes('blocked') || error?.message?.includes('safety') ? 422 :
+                        error?.message?.includes('429') || error?.message?.includes('quota') ? 429 : 500;
+    res.status(statusCode).json({ error: error.message || 'Generation failed' });
   }
 };
 

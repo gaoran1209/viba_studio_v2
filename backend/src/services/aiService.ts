@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -11,7 +11,7 @@ const getClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-export type SkinTone = 'Light' | 'Medium' | 'Dark';
+export type SkinTone = 'White' | 'East Asian' | 'Latino' | 'Black' | 'South Asian' | '';
 
 export const PROMPTS = {
   derivation_describe: `# Role
@@ -71,23 +71,75 @@ Subject centered.`,
   swap: "Compose the person from the first image into the scene provided by the second image. Harmonize lighting, shadows, and color tones so that the character appears to naturally belong in the environment. Keep the pose of the person in the second image unchanged, and choose a full-body or suitable composition according to the scene."
 };
 
+/**
+ * Helper to extract an image from a Gemini generateContent response.
+ * Validates that a real image was generated and throws descriptive errors.
+ */
+function extractImageFromResponse(response: any): string {
+  const candidate = response.candidates?.[0];
+
+  if (!candidate) {
+    throw new Error("No candidates returned from model. The request may have been blocked.");
+  }
+
+  const finishReason = candidate.finishReason;
+  if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+    throw new Error(`Image generation blocked: finishReason=${finishReason}. The model could not produce an image for this input.`);
+  }
+
+  const parts = candidate.content?.parts || [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      const mimeType = part.inlineData.mimeType || 'image/png';
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
+  }
+
+  // If we got text but no image, it means the model responded with text only
+  const textParts = parts.filter((p: any) => p.text);
+  if (textParts.length > 0) {
+    console.warn("Model returned text instead of image:", textParts[0].text?.substring(0, 200));
+    throw new Error("Model returned text instead of generating an image. This may be due to content restrictions or an unsupported prompt.");
+  }
+
+  throw new Error("No image data found in model response.");
+}
+
+/**
+ * Check if an error is a rate-limit / quota error that should not be retried.
+ */
+function isQuotaError(error: any): boolean {
+  const message = error?.message || '';
+  const status = error?.status || error?.code || error?.statusCode || '';
+  const statusStr = String(status);
+
+  return (
+    message.includes('429') ||
+    message.includes('quota') ||
+    message.includes('RESOURCE_EXHAUSTED') ||
+    message.includes('rate limit') ||
+    statusStr === '429' ||
+    statusStr === 'RESOURCE_EXHAUSTED'
+  );
+}
+
 // Utility for Timeout and Retry
 async function withTimeoutAndRetry<T>(
   operation: () => Promise<T>,
-  timeoutMs: number = 30000, 
+  timeoutMs: number = 60000,
   maxRetries: number = 3
 ): Promise<T> {
   let attempt = 0;
-  
+
   while (true) {
     try {
       if (attempt > 0) {
-        const delay = Math.pow(2, attempt) * 1000;
+        const delay = Math.min(Math.pow(2, attempt) * 1000, 30000);
         console.log(`Retrying attempt ${attempt} after ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
       );
 
@@ -95,10 +147,10 @@ async function withTimeoutAndRetry<T>(
 
     } catch (error: any) {
       attempt++;
-      console.warn(`Attempt ${attempt} failed:`, error);
-      
-      if (error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('RESOURCE_EXHAUSTED')) {
-        console.error("Quota exceeded, stopping retries.");
+      console.warn(`Attempt ${attempt} failed:`, error?.message || error);
+
+      if (isQuotaError(error)) {
+        console.error("Quota/rate limit exceeded, stopping retries.");
         throw error;
       }
 
@@ -117,11 +169,11 @@ export const generateDerivations = async (
   config?: { textModel: string; imageModel: string }
 ): Promise<{ images: string[], description: string }> => {
   const ai = getClient();
-  
-  // Step 1: Image to Text (Description)
+
+  // Step 1: Image to Text (Description) - text model, no responseModalities needed
   const description = await withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: config?.textModel || 'gemini-3-pro-preview',
+      model: config?.textModel || 'gemini-2.5-flash',
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
@@ -129,16 +181,22 @@ export const generateDerivations = async (
         ],
       },
     });
-    return response.text || "A creative image.";
+    const text = response.text;
+    if (!text || text.trim().length < 20) {
+      throw new Error("Image description was too short or empty. The model could not analyze the image.");
+    }
+    return text;
   }, 60000, 2);
 
-  // Step 2: Text to Image (Generation)
+  // Step 2: Text+Reference to Image (Generation)
+  // We include the original image as a reference so the model can preserve visual style,
+  // but the prompt explicitly instructs it to generate a VARIANT, not a copy.
   const prompt = PROMPTS.derivation_generate(description, intensity, skinTone);
 
   const generateSingle = async () => {
     return withTimeoutAndRetry(async () => {
       const response = await ai.models.generateContent({
-        model: config?.imageModel || 'gemini-3.1-flash-image-preview',
+        model: config?.imageModel || 'gemini-2.0-flash-exp',
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -146,7 +204,8 @@ export const generateDerivations = async (
           ],
         },
         config: {
-          systemInstruction: 'Image aspect ratio 3:4',
+          responseModalities: [Modality.TEXT, Modality.IMAGE],
+          systemInstruction: 'You are an image generation assistant. Generate a creative image variant based on the reference image and prompt. DO NOT return the original image. You MUST generate a NEW, different image. Image aspect ratio 3:4.',
           imageConfig: {
             imageSize: '1K',
             aspectRatio: '3:4'
@@ -154,28 +213,41 @@ export const generateDerivations = async (
         }
       });
 
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-      throw new Error("No image generated");
-    }, 90000, 2); 
+      return extractImageFromResponse(response);
+    }, 120000, 2);
   };
 
-  const results = await Promise.all([
+  // Generate 4 variants concurrently
+  const results = await Promise.allSettled([
     generateSingle(),
     generateSingle(),
     generateSingle(),
     generateSingle()
   ]);
-  
-  return { images: results, description };
+
+  const successfulImages = results
+    .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
+    .map(r => r.value);
+
+  const failedCount = results.filter(r => r.status === 'rejected').length;
+  if (failedCount > 0) {
+    console.warn(`${failedCount} of 4 image generations failed.`);
+    results.filter(r => r.status === 'rejected').forEach((r: any) => {
+      console.warn('  Failed reason:', r.reason?.message || r.reason);
+    });
+  }
+
+  if (successfulImages.length === 0) {
+    const firstError = results.find(r => r.status === 'rejected') as PromiseRejectedResult;
+    throw new Error(firstError?.reason?.message || "All image generations failed");
+  }
+
+  return { images: successfulImages, description };
 };
 
 export const trainAvatar = async (files: { data: string, mimeType: string }[], model?: string): Promise<string> => {
   const ai = getClient();
-  
+
   return withTimeoutAndRetry(async () => {
     const parts: any[] = [];
     for (const file of files) {
@@ -186,14 +258,15 @@ export const trainAvatar = async (files: { data: string, mimeType: string }[], m
         }
       });
     }
-    
+
     parts.push({ text: PROMPTS.avatar });
 
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3.1-flash-image-preview',
+      model: model || 'gemini-2.0-flash-exp',
       contents: { parts },
       config: {
-        systemInstruction: 'Image aspect ratio 3:4',
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        systemInstruction: 'You are a professional portrait photographer. Generate a high-quality character image based on the reference photos. Image aspect ratio 3:4.',
         imageConfig: {
           imageSize: '4K',
           aspectRatio: '3:4'
@@ -201,12 +274,7 @@ export const trainAvatar = async (files: { data: string, mimeType: string }[], m
       }
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate avatar preview");
+    return extractImageFromResponse(response);
   }, 120000, 2);
 };
 
@@ -215,7 +283,7 @@ export const generateTryOn = async (modelB64: string, modelMime: string, garment
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3.1-flash-image-preview',
+      model: model || 'gemini-2.0-flash-exp',
       contents: {
         parts: [
           { inlineData: { mimeType: modelMime, data: modelB64 } },
@@ -224,7 +292,8 @@ export const generateTryOn = async (modelB64: string, modelMime: string, garment
         ]
       },
       config: {
-        systemInstruction: 'Image aspect ratio 3:4',
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        systemInstruction: 'You are a virtual try-on assistant. Generate a realistic image of the person wearing the clothing. Image aspect ratio 3:4.',
         imageConfig: {
           imageSize: '2K',
           aspectRatio: '3:4'
@@ -232,12 +301,7 @@ export const generateTryOn = async (modelB64: string, modelMime: string, garment
       }
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate try-on image");
+    return extractImageFromResponse(response);
   }, 120000, 2);
 };
 
@@ -246,7 +310,7 @@ export const generateSwap = async (sourceB64: string, sourceMime: string, sceneB
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3.1-flash-image-preview',
+      model: model || 'gemini-2.0-flash-exp',
       contents: {
         parts: [
           { inlineData: { mimeType: sourceMime, data: sourceB64 } },
@@ -255,7 +319,8 @@ export const generateSwap = async (sourceB64: string, sourceMime: string, sceneB
         ]
       },
       config: {
-        systemInstruction: 'Image aspect ratio 3:4',
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        systemInstruction: 'You are a scene composition assistant. Compose the person into the scene naturally. Image aspect ratio 3:4.',
         imageConfig: {
           imageSize: '2K',
           aspectRatio: '3:4'
@@ -263,11 +328,6 @@ export const generateSwap = async (sourceB64: string, sourceMime: string, sceneB
       }
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to generate swap image");
+    return extractImageFromResponse(response);
   }, 120000, 2);
 };

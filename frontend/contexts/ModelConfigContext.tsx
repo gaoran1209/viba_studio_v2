@@ -11,18 +11,17 @@ export interface ModelConfig {
 }
 
 const DEFAULT_CONFIG: ModelConfig = {
-  derivation_text: 'gemini-3-pro-preview',
-  derivation_image: 'gemini-3.1-flash-image-preview',
-  avatar: 'gemini-3.1-flash-image-preview',
-  tryOn: 'gemini-3.1-flash-image-preview',
-  swap: 'gemini-3.1-flash-image-preview'
+  derivation_text: 'gemini-2.5-flash',
+  derivation_image: 'gemini-2.0-flash-exp',
+  avatar: 'gemini-2.0-flash-exp',
+  tryOn: 'gemini-2.0-flash-exp',
+  swap: 'gemini-2.0-flash-exp'
 };
 
 export const AVAILABLE_MODELS = [
-  'gemini-3-pro-preview',
-  'gemini-3.1-flash-image-preview',
+  'gemini-2.0-flash-exp',
+  'gemini-2.5-flash',
   'gemini-2.5-pro',
-  'gemini-2.5-pro-image'
 ];
 
 interface ModelConfigContextType {

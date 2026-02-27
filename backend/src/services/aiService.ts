@@ -13,6 +13,9 @@ const getClient = () => {
 
 export type SkinTone = 'White' | 'East Asian' | 'Latino' | 'Black' | 'South Asian' | '';
 
+const DEFAULT_TEXT_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+
 export const PROMPTS = {
   derivation_describe: `# Role
 你是一位专业的视觉内容分析专家，擅长将图像转化为精确、结构化且具有空间感知能力的文字描述。你的目标是让读者仅通过阅读文字就能在脑海中完美重建画面。
@@ -70,6 +73,9 @@ Subject centered.`,
   tryOn: "Generate a realistic image of the person from the first image wearing the clothing from the second image. Ensure the clothing is exactly consistent with the original, while maintaining natural fit, matching the model’s pose, lighting, and body shape. The garment silhouette, fabric, and structure must not be altered.",
   swap: "Compose the person from the first image into the scene provided by the second image. Harmonize lighting, shadows, and color tones so that the character appears to naturally belong in the environment. Keep the pose of the person in the second image unchanged, and choose a full-body or suitable composition according to the scene."
 };
+
+const resolveTextModel = () => DEFAULT_TEXT_MODEL;
+const resolveImageModel = () => DEFAULT_IMAGE_MODEL;
 
 /**
  * Helper to extract an image from a Gemini generateContent response.
@@ -173,7 +179,7 @@ export const generateDerivations = async (
   // Step 1: Image to Text (Description) - text model, no responseModalities needed
   const description = await withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: config?.textModel || 'gemini-2.5-flash',
+      model: resolveTextModel(),
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Data } },
@@ -196,7 +202,7 @@ export const generateDerivations = async (
   const generateSingle = async () => {
     return withTimeoutAndRetry(async () => {
       const response = await ai.models.generateContent({
-        model: config?.imageModel || 'gemini-2.0-flash-exp',
+        model: resolveImageModel(),
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -262,7 +268,7 @@ export const trainAvatar = async (files: { data: string, mimeType: string }[], m
     parts.push({ text: PROMPTS.avatar });
 
     const response = await ai.models.generateContent({
-      model: model || 'gemini-2.0-flash-exp',
+      model: resolveImageModel(),
       contents: { parts },
       config: {
         responseModalities: [Modality.TEXT, Modality.IMAGE],
@@ -283,7 +289,7 @@ export const generateTryOn = async (modelB64: string, modelMime: string, garment
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-2.0-flash-exp',
+      model: resolveImageModel(),
       contents: {
         parts: [
           { inlineData: { mimeType: modelMime, data: modelB64 } },
@@ -310,7 +316,7 @@ export const generateSwap = async (sourceB64: string, sourceMime: string, sceneB
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-2.0-flash-exp',
+      model: resolveImageModel(),
       contents: {
         parts: [
           { inlineData: { mimeType: sourceMime, data: sourceB64 } },

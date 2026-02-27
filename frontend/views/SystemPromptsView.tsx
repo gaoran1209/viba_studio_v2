@@ -2,7 +2,7 @@ import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { PROMPTS } from '../services/geminiService';
 import { Layers, User, Shirt, RefreshCw, ChevronDown } from 'lucide-react';
-import { useModelConfig, AVAILABLE_MODELS, FeatureKey } from '../contexts/ModelConfigContext';
+import { useModelConfig, MODEL_OPTIONS_BY_FEATURE, FeatureKey } from '../contexts/ModelConfigContext';
 
 export const SystemPromptsView: React.FC = () => {
   const { t } = useLanguage();
@@ -97,7 +97,7 @@ export const SystemPromptsView: React.FC = () => {
                              onChange={(e) => updateModel(step.key, e.target.value)}
                              className="appearance-none w-full pl-3 pr-8 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                            >
-                             {AVAILABLE_MODELS.map(m => (
+                             {MODEL_OPTIONS_BY_FEATURE[step.key].map(m => (
                                <option key={m} value={m}>{m}</option>
                              ))}
                            </select>

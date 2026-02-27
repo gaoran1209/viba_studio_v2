@@ -10,19 +10,41 @@ export interface ModelConfig {
   swap: string;
 }
 
+const DEFAULT_TEXT_MODEL = 'gemini-3-flash-preview';
+const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
+const LEGACY_TEXT_MODEL = 'gemini-3-pro-preview';
+const LEGACY_IMAGE_MODEL = 'gemini-3-pro-image-preview';
+
+const normalizeTextModel = (model: string) =>
+  model === LEGACY_TEXT_MODEL ? DEFAULT_TEXT_MODEL : model;
+
+const normalizeImageModel = (model: string) =>
+  model === LEGACY_IMAGE_MODEL ? DEFAULT_IMAGE_MODEL : model;
+
+const normalizeConfig = (config: ModelConfig): ModelConfig => ({
+  ...config,
+  derivation_text: normalizeTextModel(config.derivation_text),
+  derivation_image: normalizeImageModel(config.derivation_image),
+  avatar: normalizeImageModel(config.avatar),
+  tryOn: normalizeImageModel(config.tryOn),
+  swap: normalizeImageModel(config.swap),
+});
+
 const DEFAULT_CONFIG: ModelConfig = {
-  derivation_text: 'gemini-2.5-flash',
-  derivation_image: 'gemini-2.0-flash-exp',
-  avatar: 'gemini-2.0-flash-exp',
-  tryOn: 'gemini-2.0-flash-exp',
-  swap: 'gemini-2.0-flash-exp'
+  derivation_text: DEFAULT_TEXT_MODEL,
+  derivation_image: DEFAULT_IMAGE_MODEL,
+  avatar: DEFAULT_IMAGE_MODEL,
+  tryOn: DEFAULT_IMAGE_MODEL,
+  swap: DEFAULT_IMAGE_MODEL
 };
 
-export const AVAILABLE_MODELS = [
-  'gemini-2.0-flash-exp',
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-];
+export const MODEL_OPTIONS_BY_FEATURE: Record<FeatureKey, string[]> = {
+  derivation_text: [DEFAULT_TEXT_MODEL],
+  derivation_image: [DEFAULT_IMAGE_MODEL],
+  avatar: [DEFAULT_IMAGE_MODEL],
+  tryOn: [DEFAULT_IMAGE_MODEL],
+  swap: [DEFAULT_IMAGE_MODEL],
+};
 
 interface ModelConfigContextType {
   config: ModelConfig;
@@ -35,7 +57,7 @@ const ModelConfigContext = createContext<ModelConfigContextType | undefined>(und
 export const ModelConfigProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [config, setConfig] = useState<ModelConfig>(() => {
     const saved = localStorage.getItem('viba_model_config');
-    return saved ? { ...DEFAULT_CONFIG, ...JSON.parse(saved) } : DEFAULT_CONFIG;
+    return saved ? normalizeConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) }) : DEFAULT_CONFIG;
   });
 
   useEffect(() => {
@@ -43,7 +65,11 @@ export const ModelConfigProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [config]);
 
   const updateModel = (feature: FeatureKey, model: string) => {
-    setConfig(prev => ({ ...prev, [feature]: model }));
+    const allowedModels = MODEL_OPTIONS_BY_FEATURE[feature];
+    const fallback = allowedModels[0];
+    const normalizedModel = feature === 'derivation_text' ? normalizeTextModel(model) : normalizeImageModel(model);
+    const nextModel = allowedModels.includes(normalizedModel) ? normalizedModel : fallback;
+    setConfig(prev => ({ ...prev, [feature]: nextModel }));
   };
 
   const resetConfig = () => setConfig(DEFAULT_CONFIG);

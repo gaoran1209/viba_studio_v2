@@ -138,7 +138,7 @@ export const generateDerivations = async (
   const generateSingle = async () => {
     return withTimeoutAndRetry(async () => {
       const response = await ai.models.generateContent({
-        model: config?.imageModel || 'gemini-3-pro-image-preview',
+        model: config?.imageModel || 'gemini-3.1-flash-image-preview',
         contents: {
           parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -190,7 +190,7 @@ export const trainAvatar = async (files: { data: string, mimeType: string }[], m
     parts.push({ text: PROMPTS.avatar });
 
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
+      model: model || 'gemini-3.1-flash-image-preview',
       contents: { parts },
       config: {
         systemInstruction: 'Image aspect ratio 3:4',
@@ -215,7 +215,7 @@ export const generateTryOn = async (modelB64: string, modelMime: string, garment
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
+      model: model || 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
           { inlineData: { mimeType: modelMime, data: modelB64 } },
@@ -246,7 +246,7 @@ export const generateSwap = async (sourceB64: string, sourceMime: string, sceneB
 
   return withTimeoutAndRetry(async () => {
     const response = await ai.models.generateContent({
-      model: model || 'gemini-3-pro-image-preview',
+      model: model || 'gemini-3.1-flash-image-preview',
       contents: {
         parts: [
           { inlineData: { mimeType: sourceMime, data: sourceB64 } },

@@ -12,15 +12,15 @@ export interface ModelConfig {
 
 const DEFAULT_CONFIG: ModelConfig = {
   derivation_text: 'gemini-3-pro-preview',
-  derivation_image: 'gemini-3-pro-image-preview',
-  avatar: 'gemini-3-pro-image-preview',
-  tryOn: 'gemini-3-pro-image-preview',
-  swap: 'gemini-3-pro-image-preview'
+  derivation_image: 'gemini-3.1-flash-image-preview',
+  avatar: 'gemini-3.1-flash-image-preview',
+  tryOn: 'gemini-3.1-flash-image-preview',
+  swap: 'gemini-3.1-flash-image-preview'
 };
 
 export const AVAILABLE_MODELS = [
   'gemini-3-pro-preview',
-  'gemini-3-pro-image-preview',
+  'gemini-3.1-flash-image-preview',
   'gemini-2.5-pro',
   'gemini-2.5-pro-image'
 ];

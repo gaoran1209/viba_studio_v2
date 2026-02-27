@@ -16,7 +16,7 @@ We will reorganize the current client-only project into a monorepo-style structu
 Refactor the existing frontend to support the new architecture and the requested model configuration feature.
 - **New Feature: Granular Model Configuration**:
   - **UI Update**: Modify `SystemPromptsView` to replace read-only model labels with dropdown selectors.
-  - **Supported Models**: `gemini-3-pro-preview`, `gemini-3-pro-image-preview`, `gemini-2.5-pro`, `gemini-2.5-pro-image`.
+  - **Supported Models**: `gemini-3-pro-preview`, `gemini-3.1-flash-image-preview`, `gemini-2.5-pro`, `gemini-2.5-pro-image`.
   - **Storage**: Persist model selections in `localStorage` (per feature: Derivation, Avatar, TryOn, Swap).
   - **Logic**: Update `geminiService.ts` to accept dynamic model names instead of hardcoded constants.
 - **Authentication UI**:

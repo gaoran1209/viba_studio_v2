@@ -49,6 +49,12 @@ cd ../frontend && npm install
 
 ### 3) 配置环境变量
 
+先在 shell 环境中配置 Gemini Key（推荐写入 `~/.zshenv` 或 `~/.zprofile`）：
+
+```bash
+export GEMINI_API_KEY=your_gemini_api_key
+```
+
 后端新建 `backend/.env`：
 
 ```env
@@ -56,7 +62,6 @@ PORT=3001
 DATABASE_URL=postgresql://postgres:password@localhost:5432/viba_db
 DB_SSL=false
 JWT_SECRET=replace_with_a_long_random_secret
-GEMINI_API_KEY=your_gemini_api_key
 
 # 可选：Cloudflare R2
 R2_ACCOUNT_ID=
@@ -71,6 +76,8 @@ R2_PUBLIC_URL=
 ```env
 VITE_API_URL=http://localhost:3001/api/v1
 ```
+
+如需通过仓库根目录的 `docker-compose.yml` 启动，可参考 [`.env.local.example`](/Users/ryan/项目/github/viba_studio_v2/.env.local.example) 在本机创建未提交的 `.env.local`，或直接在当前 shell 中导出 `GEMINI_API_KEY`。
 
 ### 4) 启动服务
 

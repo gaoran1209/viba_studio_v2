@@ -1,7 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import dotenv from 'dotenv';
-
-dotenv.config();
+import '../config/loadEnv';
 
 const getClient = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;

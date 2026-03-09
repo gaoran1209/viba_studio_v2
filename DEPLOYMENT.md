@@ -95,3 +95,26 @@ After deployment, perform these checks:
 *   **CORS Errors**: If Frontend cannot talk to Backend, check `backend/src/index.ts` or `cors` config. Ensure Vercel domain is allowed.
 *   **Database Connection Error**: Check if `ssl: { rejectUnauthorized: false }` is needed for Supabase (it is currently enabled in code).
 *   **Build Failures**: Check `package.json` dependencies.
+
+## 6. GitHub Actions -> EC2 Docker Deployment
+
+If you deploy this project to Docker on EC2 via GitHub Actions, keep runtime secrets out of the repository and store them in GitHub Actions secrets.
+
+### Required GitHub Actions secrets
+
+- `EC2_HOST`
+- `EC2_USERNAME`
+- `EC2_SSH_KEY`
+- `GHCR_USERNAME`
+- `GHCR_TOKEN`
+- `EC2_ENV_FILE`
+
+### How `GEMINI_API_KEY` is handled
+
+1. Add `GEMINI_API_KEY=...` to the multi-line `EC2_ENV_FILE` secret.
+2. The deploy workflow writes `EC2_ENV_FILE` to `~/viba-studio/.env` on EC2.
+3. `docker compose --env-file .env` loads that file.
+4. `docker-compose.yml` passes `GEMINI_API_KEY` into the `backend` container.
+5. The workflow verifies both the EC2 `.env` file and the `backend` container contain `GEMINI_API_KEY`.
+
+Use [`.env.ec2.example`](/Users/ryan/项目/github/viba_studio_v2/.env.ec2.example) as the template for `EC2_ENV_FILE`.

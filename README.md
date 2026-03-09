@@ -49,12 +49,6 @@ cd ../frontend && npm install
 
 ### 3) 配置环境变量
 
-先在 shell 环境中配置 Gemini Key（推荐写入 `~/.zshenv` 或 `~/.zprofile`）：
-
-```bash
-export GEMINI_API_KEY=your_gemini_api_key
-```
-
 后端新建 `backend/.env`：
 
 ```env
@@ -77,7 +71,7 @@ R2_PUBLIC_URL=
 VITE_API_URL=http://localhost:3001/api/v1
 ```
 
-如需通过仓库根目录的 `docker-compose.yml` 启动，可参考 [`.env.local.example`](/Users/ryan/项目/github/viba_studio_v2/.env.local.example) 在本机创建未提交的 `.env.local`，或直接在当前 shell 中导出 `GEMINI_API_KEY`。
+如需通过仓库根目录的 `docker-compose.yml` 启动，可参考 [`.env.local.example`](/Users/ryan/项目/github/viba_studio_v2/.env.local.example) 在本机创建未提交的 `.env.local`，并在当前 shell 中导出 `GEMINI_API_KEY`。
 
 ### 4) 启动服务
 
@@ -137,6 +131,26 @@ docker compose up -d
 - 前端：Vercel（Root Directory: `frontend`）
 - 后端：Render（Root Directory: `backend`，可用 `render.yaml`）
 - 数据库：Supabase PostgreSQL
+
+## GitHub 到 EC2 Docker
+
+如果你使用 GitHub Actions 自动部署到 EC2 Docker：
+
+1. 在 GitHub 仓库中进入 `Settings -> Secrets and variables -> Actions`。
+2. 新增以下 `Repository secrets`：
+   - `EC2_HOST`
+   - `EC2_USERNAME`
+   - `EC2_SSH_KEY`
+   - `GHCR_USERNAME`
+   - `GHCR_TOKEN`
+   - `EC2_ENV_FILE`
+3. 其中 `EC2_ENV_FILE` 填入整份 EC2 运行时环境文件内容，模板见 [`.env.ec2.example`](/Users/ryan/项目/github/viba_studio_v2/.env.ec2.example)。
+4. `GEMINI_API_KEY` 必须写在 `EC2_ENV_FILE` 中，而不是写进仓库文件。
+5. 工作流会把 `EC2_ENV_FILE` 写入 EC2 的 `~/viba-studio/.env`，再通过 `docker compose --env-file .env` 注入到 `backend` 容器。
+6. 部署时 workflow 会检查：
+   - EC2 上的 `.env` 是否包含 `GEMINI_API_KEY`
+   - `viba_backend` 容器内是否成功读取 `GEMINI_API_KEY`
+   - 后端 `http://localhost:3001/health` 是否通过
 
 ## 常见问题
 

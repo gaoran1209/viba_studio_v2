@@ -7,7 +7,7 @@ import generationRoutes from './routes/generations';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const REQUIRED_ENV_VARS = ['JWT_SECRET'];
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'GEMINI_API_KEY'];
 
 const validateRequiredEnv = () => {
   const missing = REQUIRED_ENV_VARS.filter((name) => !process.env[name]);
